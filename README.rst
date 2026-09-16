@@ -81,7 +81,8 @@ The command understands the following command line arguments:
 
 .. code-block:: console
 
-   usage: ebuildtester [-h] [--version] [--atom ATOM [ATOM ...]] [--binhost BINHOST] [--live-ebuild]
+   usage: ebuildtester [-h] [--version] [--atom ATOM [ATOM ...]] [--binhost BINHOST]
+                       [--no-verify-signature] [--live-ebuild]
                        [--manual] --portage-dir PORTAGE_DIR [--overlay-dir OVERLAY_DIR] [--update]
                        [--install-basic-packages] [--threads N] [--use USE [USE ...]]
                        [--global-use GLOBAL_USE [GLOBAL_USE ...]] [--unmask ATOM] [--unstable]
@@ -99,6 +100,7 @@ The command understands the following command line arguments:
      --atom ATOM [ATOM ...]
                            The package atom(s) to install
      --binhost BINHOST     Binhost URI
+     --no-verify-signature Disable binhost package signature verification
      --live-ebuild         Unmask the live ebuild of the atom
      --manual              Install package manually
      --portage-dir PORTAGE_DIR

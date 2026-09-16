@@ -27,6 +27,12 @@ def parse_commandline(args, d):
         "--binhost",
         help="Binhost URI")
     parser.add_argument(
+        "--no-verify-signature",
+        help="Disable binhost package signature verification",
+        dest="verify_signature",
+        action="store_false",
+        default=True)
+    parser.add_argument(
         "--live-ebuild",
         help="Unmask the live ebuild of the atom",
         action="store_true")

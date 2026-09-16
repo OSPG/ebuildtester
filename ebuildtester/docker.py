@@ -247,11 +247,13 @@ class Docker:
                      ">> /etc/portage/make.conf")
         if options.OPTIONS.binhost:
             self.execute("getuto")
+            verify_signature = str(options.OPTIONS.verify_signature).lower()
             self.execute("echo -e '[ebuildtester]\n"
                          "priority = 999\n"
+                         "verify-signature = {}\n"
                          "sync-uri = {}\n'"
                          ">> /etc/portage/binrepos.conf/ebuildtester.conf"
-                         .format(options.OPTIONS.binhost))
+                         .format(verify_signature, options.OPTIONS.binhost))
         if options.OPTIONS.unstable:
             self.execute("echo ACCEPT_KEYWORDS=\\\"~amd64\\\" " +
                          ">> /etc/portage/make.conf")

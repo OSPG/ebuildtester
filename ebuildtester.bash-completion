@@ -10,6 +10,7 @@ _ebuildtester() {
       --version
       --atom
       --binhost
+      --no-verify-signature
       --live-ebuild
       --manual
       --portage-dir
