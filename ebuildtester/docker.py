@@ -4,6 +4,8 @@ import os
 import re
 import sys
 import subprocess
+import signal
+from threading import Thread
 from platformdirs import user_cache_dir
 
 import ebuildtester.options as options
@@ -19,6 +21,17 @@ class Docker:
     """The Docker class."""
     def __init__(self, local_portage, overlay_dirs):
         """Create a new container."""
+
+        self.cid = None
+        self._cleaned_up = False
+        try:
+            self._initialize(local_portage, overlay_dirs)
+        except BaseException:
+            self.cleanup()
+            raise
+
+    def _initialize(self, local_portage, overlay_dirs):
+        """Create and configure the container."""
 
         docker_image = options.OPTIONS.docker_image
         repo_names = self._get_repo_names(overlay_dirs)
@@ -53,64 +66,46 @@ class Docker:
         else:
             cmd_string = cmd
         options.log.info("%s %s", self.cid[:6], cmd)
-        if sys.stderr.isatty() and not options.OPTIONS.batch:
-            # Attached to a terminal: allocate a tty on the container side
-            # so portage emits its own terminal title updates
-            # ("<hostname>: emerge: (X of Y) pkg"), which the readers below
-            # relay to the real terminal. This requires not attaching our
-            # piped stdin, hence the command is passed via -c.
-            docker_cmd = options.OPTIONS.docker_command + ["exec", "--tty"]
-            docker_cmd += [self.cid, "/bin/bash", "-c", cmd_string]
-            docker = subprocess.Popen(docker_cmd,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      stdin=subprocess.DEVNULL,
-                                      universal_newlines=True)
-        else:
-            # Not attached to a terminal (or batch mode): keep the previous,
-            # escape-free behavior by running without a tty.
-            docker_cmd = options.OPTIONS.docker_command \
-                + ["exec", "--interactive"]
-            docker_cmd += [self.cid, "/bin/bash"]
-            docker = subprocess.Popen(docker_cmd,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      stdin=subprocess.PIPE,
-                                      universal_newlines=True)
-            docker.stdin.write(cmd_string + "\n")
-            docker.stdin.close()
-
-        stdout_reader = os.fork()
-        if stdout_reader == 0:
-            try:
-                self._reader(docker, docker.stdout, "stdout")
-            except KeyboardInterrupt:
-                pass
-            sys.exit(0)
-
-        stderr_reader = os.fork()
-        if stderr_reader == 0:
-            try:
-                self._reader(docker, docker.stderr, "stderr")
-            except KeyboardInterrupt:
-                pass
-            sys.exit(0)
-
+        interactive = sys.stdin.isatty() and not options.OPTIONS.batch
+        docker_cmd = options.OPTIONS.docker_command + ["exec"]
+        if interactive:
+            # Docker forwards terminal input, including Ctrl-C, to the command.
+            docker_cmd += ["--tty", "--interactive"]
+        docker_cmd += [self.cid, "/bin/bash", "-c", cmd_string]
+        docker = subprocess.Popen(docker_cmd,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE,
+                                  stdin=None if interactive
+                                  else subprocess.DEVNULL,
+                                  universal_newlines=True)
+        readers = [Thread(target=self._reader, args=(stream, name))
+                   for stream, name in ((docker.stdout, "stdout"),
+                                        (docker.stderr, "stderr"))]
+        for reader in readers:
+            reader.start()
         try:
-            os.waitid(os.P_PID, stdout_reader, os.WEXITED)
-            os.waitid(os.P_PID, stderr_reader, os.WEXITED)
-            docker.wait()
-        except KeyboardInterrupt:
-            try:
-                options.log.info("received keyboard interrupt")
+            while True:
+                try:
+                    docker.wait()
+                    break
+                except KeyboardInterrupt:
+                    if not interactive:
+                        raise SystemExit(128 + signal.SIGINT)
+                    # Keep the client attached while the command handles Ctrl-C.
+        finally:
+            if docker.poll() is None:
                 docker.terminate()
-                self.shell()
-                options.log.info("return from shell, initiating shutdown")
-                self.cleanup()
-                sys.exit(0)
-            except OSError:
-                pass
-            docker.wait()
+                docker.wait()
+            for reader in readers:
+                reader.join()
+            docker.stdout.close()
+            docker.stderr.close()
+
+        if interactive and docker.returncode == 128 + signal.SIGINT:
+            options.log.info("command interrupted, opening interactive shell")
+            self.shell()
+            # Do not resume setup or the build after leaving the recovery shell.
+            raise SystemExit(0)
 
         if docker.returncode != 0:
             options.log.error("running in container %s" % (str(self.cid)))
@@ -124,35 +119,48 @@ class Docker:
                                   + ["exec", "--tty", "--interactive",
                                      self.cid, "/bin/bash"])
         try:
-            docker.wait()
-        except KeyboardInterrupt:
-            options.log.info("ignoring keyboard interrupt")
+            while True:
+                try:
+                    docker.wait()
+                    return
+                except KeyboardInterrupt:
+                    # The attached shell handles Ctrl-C; wait for its exit.
+                    continue
+        finally:
+            if docker.poll() is None:
+                docker.terminate()
+                docker.wait()
 
     def cleanup(self):
-        """Clean up."""
+        """Stop the container and optionally remove it."""
 
+        if not self.cid or self._cleaned_up:
+            return
+        self._cleaned_up = True
+        self.stop()
         if options.OPTIONS.rm:
             self.remove()
 
-    def remove(self):
-        """Remove the docker container."""
+    def stop(self):
+        """Kill the container and all commands running inside it."""
 
-        options.log.info("stopping container")
+        options.log.info("killing container")
         docker = subprocess.Popen(options.OPTIONS.docker_command
                                   + ["kill", self.cid])
         docker.wait()
+
+    def remove(self):
+        """Remove the stopped docker container."""
+
         options.log.info("deleting container")
         docker = subprocess.Popen(options.OPTIONS.docker_command
                                   + ["rm", self.cid])
         docker.wait()
 
-    def _reader(self, proc, stream, name):
+    def _reader(self, stream, name):
         """Read from a subprocess stream."""
 
-        while True:
-            out = stream.readline()
-            if out == "" and proc.poll() is not None:
-                break
+        for out in stream:
             options.log.info("%s (%s): %s" %
                              (self.cid[:6], name, out.rstrip()))
             options._log_ch.flush()

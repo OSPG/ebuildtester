@@ -97,9 +97,11 @@ def parse_commandline(args, d):
         metavar="PYTHON_TARGETS",
         help="Specify a PYTHON_TARGETS")
     parser.add_argument(
-        "--rm",
-        help="Remove container after session is done",
-        action="store_true")
+        "--no-rm",
+        help="Keep the stopped container after session is done",
+        dest="rm",
+        action="store_false",
+        default=True)
     parser.add_argument(
         "--storage-opt",
         help="Storage driver options for all volumes (same as Docker param)",

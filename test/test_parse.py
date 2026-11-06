@@ -27,6 +27,17 @@ class TestParse(unittest.TestCase):
         options = ebuildtester.parse.parse_commandline(self.args + ["--manual"], {})
         self.assertTrue(options.manual)
 
+    def test_container_removal(self):
+        for config, flags, expected in (
+                ({}, [], True),
+                ({}, ['--no-rm'], False),
+                ({'rm': False}, [], False),
+                ({'rm': True}, ['--no-rm'], False)):
+            with self.subTest(config=config, flags=flags):
+                options = ebuildtester.parse.parse_commandline(
+                    self.args + ['--manual'] + flags, config)
+                self.assertEqual(options.rm, expected)
+
     def test_portage_dir(self):
         import sys
         if sys.version_info[0] == 2 and sys.version_info[1] == 6:

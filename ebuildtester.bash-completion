@@ -25,7 +25,7 @@ _ebuildtester() {
       --gcc-version
       --python-single-target
       --python-targets
-      --rm
+      --no-rm
       --storage-opt
       --with-X
       --with-vnc

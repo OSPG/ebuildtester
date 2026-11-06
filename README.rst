@@ -74,6 +74,11 @@ where we have specified two USE flags, ``USE1`` and ``USE2``. The
 installing the ``ATOM``. All specified dependencies will be installed as
 well.
 
+The container is stopped when the session ends, including when you exit the
+interactive shell or terminate ebuildtester with SIGTERM or SIGHUP.
+During an interactive build, Ctrl-C interrupts the command and opens a shell.
+In batch mode, Ctrl-C ends the session.
+
 Command line arguments
 ----------------------
 
@@ -87,7 +92,7 @@ The command understands the following command line arguments:
                        [--install-basic-packages] [--threads N] [--use USE [USE ...]]
                        [--global-use GLOBAL_USE [GLOBAL_USE ...]] [--unmask ATOM] [--unstable]
                        [--gcc-version VER] [--python-single-target PYTHON_SINGLE_TARGET]
-                       [--python-targets PYTHON_TARGETS] [--rm] [--storage-opt STORAGE_OPT [STORAGE_OPT ...]]
+                       [--python-targets PYTHON_TARGETS] [--no-rm] [--storage-opt STORAGE_OPT [STORAGE_OPT ...]]
                        [--with-X] [--with-vnc] [--profile PROFILE] [--features FEATURES [FEATURES ...]]
                        [--docker-image DOCKER_IMAGE] [--docker-command DOCKER_COMMAND] [--pull]
                        [--show-options] [--ccache CCACHE_DIR] [--batch]
@@ -121,7 +126,7 @@ The command understands the following command line arguments:
                            Specify a PYTHON_SINGLE_TARGET
      --python-targets PYTHON_TARGETS
                            Specify a PYTHON_TARGETS
-     --rm                  Remove container after session is done
+     --no-rm               Keep the stopped container after session is done
      --storage-opt STORAGE_OPT [STORAGE_OPT ...]
                            Storage driver options for all volumes (same as Docker param)
      --with-X              Globally enable the X USE flag
