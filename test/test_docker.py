@@ -14,7 +14,80 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from ebuildtester.docker import Docker
+from ebuildtester.parse import parse_commandline
 import ebuildtester.options as options
+
+
+class TestPortageSettings(unittest.TestCase):
+    """Exercise generated configuration commands in a temporary Portage tree."""
+
+    def test_pkg_testing_directories_and_atom_settings(self):
+        settings = parse_commandline([
+            '--portage-dir', '/gentoo', '--atom', 'app-editors/nano',
+            '--use', 'unicode'], {})
+        container = Docker.__new__(Docker)
+        with tempfile.TemporaryDirectory() as directory:
+            portage = Path(directory) / 'portage'
+
+            def execute(command):
+                subprocess.run(
+                    ['/bin/bash', '-c', command.replace(
+                        '/etc/portage', str(portage))], check=True)
+
+            with patch.object(options, 'OPTIONS', settings), \
+                    patch.object(container, 'execute', side_effect=execute):
+                container._prepare_portage_dirs()
+                container._enable_test()
+                container._unmask_atom()
+                # Repeated preparation must preserve existing settings.
+                container._prepare_portage_dirs()
+
+            for name in ('env', 'package.env', 'package.accept_keywords',
+                         'package.use', 'package.mask', 'package.unmask',
+                         'package.license', 'repos.conf',
+                         'profile/package.use.mask',
+                         'profile/package.use.force',
+                         'profile/package.use.stable.mask',
+                         'profile/package.use.stable.force'):
+                self.assertTrue((portage / name).is_dir(), name)
+            self.assertEqual(
+                (portage / 'package.env/testbuild').read_text(),
+                'app-editors/nano tester.conf\n')
+            self.assertEqual((portage / 'env/tester.conf').read_text(),
+                             'FEATURES="test splitdebug"\n')
+            self.assertEqual((portage / 'package.use/testbuild').read_text(),
+                             'app-editors/nano unicode\n')
+            self.assertEqual(
+                (portage / 'package.accept_keywords/testbuild').read_text(),
+                'app-editors/nano ~amd64\n')
+
+    def test_ccache_make_conf(self):
+        for cache in (None, '/host/compiler-cache'):
+            with self.subTest(cache=cache):
+                settings = parse_commandline([
+                    '--portage-dir', '/gentoo', '--manual'] +
+                    (['--ccache', cache] if cache else []), {})
+                container = Docker.__new__(Docker)
+                with patch.object(options, 'OPTIONS', settings), \
+                        patch.object(container, 'execute') as execute:
+                    container._tweak_settings()
+
+                with tempfile.TemporaryDirectory() as directory:
+                    make_conf = Path(directory) / 'make.conf'
+                    for call in execute.call_args_list:
+                        command = call.args[0]
+                        if command.endswith('>> /etc/portage/make.conf'):
+                            subprocess.run([
+                                '/bin/bash', '-c', command.replace(
+                                    '/etc/portage/make.conf', str(make_conf))],
+                                check=True)
+                    configuration = make_conf.read_text()
+                    if cache:
+                        self.assertIn('CCACHE_DIR="/var/tmp/ccache"\n',
+                                      configuration)
+                        self.assertIn('CCACHE_SIZE="4G"\n', configuration)
+                    else:
+                        self.assertNotIn('CCACHE_', configuration)
 
 
 class TestCleanup(unittest.TestCase):

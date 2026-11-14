@@ -36,10 +36,16 @@ def parse_commandline(args, d):
         "--live-ebuild",
         help="Unmask the live ebuild of the atom",
         action="store_true")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--manual",
         help="Install package manually",
         default=False,
+        action="store_true")
+    mode.add_argument(
+        "--pkg-testing-tools",
+        help="Test atom USE flag combinations automatically with "
+             "pkg-testing-tool",
         action="store_true")
     parser.add_argument(
         "--portage-dir",
@@ -161,6 +167,11 @@ def parse_commandline(args, d):
         print(f'args = {",".join(args)}')
 
     options = parser.parse_args(args)
+
+    if options.pkg_testing_tools and options.manual:
+        parser.error("--pkg-testing-tools cannot be used with --manual")
+    if options.pkg_testing_tools and not options.atom:
+        parser.error("--pkg-testing-tools requires --atom")
 
     if not options.manual and options.atom is None:
         raise Exception("either specify an atom or use --manual")

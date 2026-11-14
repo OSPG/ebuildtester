@@ -27,6 +27,25 @@ class TestParse(unittest.TestCase):
         options = ebuildtester.parse.parse_commandline(self.args + ["--manual"], {})
         self.assertTrue(options.manual)
 
+    def test_pkg_testing_tools(self):
+        args = self.args + ['--atom', 'app-editors/nano']
+        self.assertFalse(ebuildtester.parse.parse_commandline(
+            args, {}).pkg_testing_tools)
+        self.assertTrue(ebuildtester.parse.parse_commandline(
+            args + ['--pkg-testing-tools'], {}).pkg_testing_tools)
+        self.assertTrue(ebuildtester.parse.parse_commandline(
+            args, {'pkg_testing_tools': True}).pkg_testing_tools)
+
+    def test_invalid_pkg_testing_tools_modes(self):
+        for flags, config in (
+                (['--pkg-testing-tools'], {}),
+                (['--manual', '--pkg-testing-tools'], {}),
+                (['--manual'], {'pkg_testing_tools': True})):
+            with self.subTest(flags=flags, config=config):
+                with self.assertRaises(SystemExit):
+                    ebuildtester.parse.parse_commandline(
+                        self.args + flags, config)
+
     def test_container_removal(self):
         for config, flags, expected in (
                 ({}, [], True),

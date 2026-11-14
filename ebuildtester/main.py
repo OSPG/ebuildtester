@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import os.path
+import shlex
 import signal
 import sys
 
@@ -70,6 +71,18 @@ def _run_container():
         options.log.info("created container %s", container.cid)
         if options.OPTIONS.manual:
             container.shell()
+        elif options.OPTIONS.pkg_testing_tools:
+            command = [
+                "pkg-testing-tool", "--test-feature-scope", "always",
+                "--append-emerge", "--autounmask=y --autounmask-write=y "
+                "--autounmask-license=y --autounmask-continue=y"]
+            if options.OPTIONS.ccache:
+                command.append("--ccache")
+            if options.OPTIONS.binhost:
+                command.append("--binpkg")
+            for atom in options.OPTIONS.atom:
+                command.append("--package-atom=" + str(atom))
+            container.execute(shlex.join(command))
         else:
             emerge_command = [
                 "emerge",
@@ -100,9 +113,9 @@ def _run_container():
                     container.execute("etc-update --verbose --automode -5")
                 else:
                     break
-            if not options.OPTIONS.batch:
-                options.log.info("opening interactive shell")
-                container.shell()
+        if not options.OPTIONS.manual and not options.OPTIONS.batch:
+            options.log.info("opening interactive shell")
+            container.shell()
 
     finally:
         container.cleanup()

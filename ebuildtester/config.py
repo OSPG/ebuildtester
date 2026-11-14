@@ -33,6 +33,7 @@ class ConfigFile:
         self._add("manual")
         self._add("overlay_dir", list)
         self._add("portage_dir")
+        self._add("pkg_testing_tools")
         self._add("pull")
         self._add("rm")
         self._add("unstable")

@@ -79,6 +79,26 @@ interactive shell or terminate ebuildtester with SIGTERM or SIGHUP.
 During an interactive build, Ctrl-C interrupts the command and opens a shell.
 In batch mode, Ctrl-C ends the session.
 
+Testing USE flag combinations
+-----------------------------
+
+Test a package with different USE flags using
+`pkg-testing-tools <https://github.com/APN-Pucky/pkg-testing-tools>`_:
+
+.. code-block:: console
+
+   ebuildtester --portage-dir /usr/local/git/gentoo \
+     --atom app-editors/nano --pkg-testing-tools --batch
+
+The tool is installed automatically and tests up to 16 USE flag combinations,
+running the package's tests each time. Omit ``--batch`` to open a shell when
+testing finishes.
+
+Add ``--ccache /path/to/ccache`` to reuse compiler output between builds, or
+``--binhost URL`` to use binary packages for dependencies. For custom testing
+options, start with ``--manual --install-basic-packages`` and run
+``pkg-testing-tool`` yourself inside the container.
+
 Command line arguments
 ----------------------
 
@@ -88,7 +108,7 @@ The command understands the following command line arguments:
 
    usage: ebuildtester [-h] [--version] [--atom ATOM [ATOM ...]] [--binhost BINHOST]
                        [--no-verify-signature] [--live-ebuild]
-                       [--manual] --portage-dir PORTAGE_DIR [--overlay-dir OVERLAY_DIR] [--update]
+                       [--manual | --pkg-testing-tools] --portage-dir PORTAGE_DIR [--overlay-dir OVERLAY_DIR] [--update]
                        [--install-basic-packages] [--threads N] [--use USE [USE ...]]
                        [--global-use GLOBAL_USE [GLOBAL_USE ...]] [--unmask ATOM] [--unstable]
                        [--gcc-version VER] [--python-single-target PYTHON_SINGLE_TARGET]
@@ -108,6 +128,7 @@ The command understands the following command line arguments:
      --no-verify-signature Disable binhost package signature verification
      --live-ebuild         Unmask the live ebuild of the atom
      --manual              Install package manually
+     --pkg-testing-tools   Test atom USE flag combinations automatically with pkg-testing-tool
      --portage-dir PORTAGE_DIR
                            The local portage directory
      --overlay-dir OVERLAY_DIR

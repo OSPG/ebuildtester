@@ -42,6 +42,7 @@ class Docker:
         self._create_container(docker_image, local_portage,
                                zip(overlay_dirs, overlay_mountpoints))
         self._start_container()
+        self._prepare_portage_dirs()
         self._set_profile()
         self._enable_global_use()
         self._tweak_settings()
@@ -256,6 +257,19 @@ class Docker:
                          options.OPTIONS.profile)
         self.execute("eselect profile set %s" % options.OPTIONS.profile)
 
+    def _prepare_portage_dirs(self):
+        """Create configuration directories used by pkg-testing-tools."""
+
+        directories = [
+            "env", "package.accept_keywords", "package.env", "package.license",
+            "package.mask", "package.unmask", "package.use", "repos.conf",
+            "profile/package.use.mask", "profile/package.use.force",
+            "profile/package.use.stable.mask",
+            "profile/package.use.stable.force",
+        ]
+        self.execute("mkdir -p " + " ".join(
+            "/etc/portage/" + directory for directory in directories))
+
     def _tweak_settings(self):
         """Tweak portage settings."""
 
@@ -270,6 +284,11 @@ class Docker:
         self.execute(("echo MAKEOPTS=\\\"-j%d\\\" " %
                       (options.OPTIONS.threads)) +
                      ">> /etc/portage/make.conf")
+        if options.OPTIONS.ccache:
+            self.execute("echo 'CCACHE_DIR=\"/var/tmp/ccache\"' "
+                         ">> /etc/portage/make.conf")
+            self.execute("echo 'CCACHE_SIZE=\"4G\"' "
+                         ">> /etc/portage/make.conf")
         if options.OPTIONS.binhost:
             self.execute("getuto")
             verify_signature = str(options.OPTIONS.verify_signature).lower()
@@ -328,10 +347,10 @@ class Docker:
         if options.OPTIONS.atom is not None:
             options.log.info("enabling test feature for %s" %
                              options.OPTIONS.atom)
-            self.execute("mkdir -p /etc/portage/env")
             for a in options.OPTIONS.atom:
                 self.execute(
-                    "echo \"%s tester.conf\" >> /etc/portage/package.env" % a)
+                    "echo \"%s tester.conf\" >> "
+                    "/etc/portage/package.env/testbuild" % a)
             self.execute(
                 "echo \"FEATURES=\\\"test splitdebug\\\"\" " +
                 "> /etc/portage/env/tester.conf")
@@ -390,6 +409,8 @@ class Docker:
 
         if not options.OPTIONS.install_basic_packages:
             options.log.info("skipping basic packages")
+            if options.OPTIONS.pkg_testing_tools:
+                self.execute("emerge --verbose app-portage/pkg-testing-tools")
         else:
             options.log.info("installing basic packages: %s" %
                              options.base_packages)

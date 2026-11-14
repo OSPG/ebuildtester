@@ -7,7 +7,8 @@ from platformdirs import user_log_dir
 from ebuildtester.atom import Atom
 
 base_packages = list(map(Atom, ["app-portage/gentoolkit",
-                                "app-portage/flaggie"]))
+                                "app-portage/flaggie",
+                                "app-portage/pkg-testing-tools"]))
 OPTIONS = None
 log = logging.getLogger("test-package")
 _log_default_formatter = \
