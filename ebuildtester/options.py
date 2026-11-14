@@ -6,6 +6,16 @@ from platformdirs import user_log_dir
 
 from ebuildtester.atom import Atom
 
+
+class _ConsoleHandler(logging.StreamHandler):
+    """Keep log lines aligned while Docker uses a raw terminal."""
+
+    def emit(self, record):
+        # Raw terminals do not translate newlines into carriage return/newline.
+        self.terminator = "\r\n" if self.stream.isatty() else "\n"
+        super().emit(record)
+
+
 base_packages = list(map(Atom, ["app-portage/gentoolkit",
                                 "app-portage/flaggie",
                                 "app-portage/pkg-testing-tools"]))
@@ -15,7 +25,7 @@ _log_default_formatter = \
     logging.Formatter("%(asctime)s - %(message)s")
 _log_debug_formatter = \
     logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-_log_ch = logging.StreamHandler()
+_log_ch = _ConsoleHandler()
 _log_ch.setLevel(logging.INFO)
 _log_ch.setFormatter(_log_default_formatter)
 _log_fh = None
